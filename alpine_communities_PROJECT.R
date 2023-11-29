@@ -35,7 +35,7 @@ env$ZoogD <- ZoogD_mapping[env$ZoogD]
 env_std <- decostand(env, "standardize")
 apply(env_std, 2, mean)	# check if means = 0
 apply(env_std, 2, sd)
-heatmaply(env_std)
+#heatmaply(env_std)
 
 # Center and scale = standardize all the speices
 spe_std <- decostand(spe, "standardize")
@@ -172,6 +172,7 @@ partialPlot(rf, env, PhysD)
 partialPlot(rf, env, ZoogD)
 partialPlot(rf, env, Snow)
 
+
 # classification of traits
 traits.norm <- decostand(traits, "normalize")
 traits.ch <- vegdist(traits.norm, "euc")
@@ -180,7 +181,8 @@ plot(tra.ch.ward,  main = "Chord - Ward")
 tra.cw.g <- cutree(tra.ch.ward, 4)
 
 
-# Compute CA
+##SPECIES
+#Compute CA
 spe.ca <- cca(spe)
 summary(spe.ca)		# default scaling 2
 summary(spe.ca, scaling = 1)
@@ -190,17 +192,35 @@ par(mfrow = c(1, 2))
 # Scaling 1: sites are centroids of species
 plot(spe.ca, 
      scaling = 1, 
-     main = "CA fish abundances - biplot scaling 1"
+     main = "CA abundances - biplot scaling 1"
 )
 # Scaling 2 (default): species are centroids of sites
-plot(spe.ca, main = "CA fish abundances - biplot scaling 2")
+plot(spe.ca, main = "CA abundances - biplot scaling 2")
 
 #to remove the horseshoe we use DCA
 spe.DCA<-decorana(spe, iweigh=0, iresc=4, ira=0, mk=26, short=0, before=NULL, after=NULL)
 spe.DCA
 plot(spe.DCA, disp="sites")
+plot(spe.DCA, scaling = 1, main = "PCA - scaling 1")
 
-#RDA over env variables
+# Adjusted R^2 retrieved from the rda object
+(R2adj <- RsquareAdj(spe.rda)$adj.r.squared)
+
+#try nmds or to filter before cca
+spe.nmds <- metaMDS(spe, distance = "bray")
+spe.nmds$stress
+plot(spe.nmds, type = "t",main = paste("NMDS Bray Curtis; Stress =",round(spe.nmds$stress, 3)))
+
+par(mfrow = c(1, 2))
+stressplot(spe.nmds, main = "Shepard plot")
+gof <- goodness(spe.nmds)
+gof
+plot(spe.nmds, type = "t", main = "Goodness of fit")
+points(spe.nmds, display = "sites", cex = gof * 300) #to see the goodness of fit if the sites
+
+
+#ENV VARIABLES
+#Compute RDA
 env.pca <- rda(env, scale = TRUE, row.wt = spe.ca$lw) #ADDED THE WEIGHT HERE
 env.pca
 summary(env.pca)
@@ -212,11 +232,8 @@ biplot(env.pca, scaling = 1, main = "PCA - scaling 1")
 spe.rda <- rda(spe.hel ~ ., env) #"." means constrained for all the env par in env3
 summary(spe.rda)
 
-# Adjusted R^2 retrieved from the rda object
-(R2adj <- RsquareAdj(spe.rda)$adj.r.squared)
-
-## Triplots of the rda results (lc site scores)
-## Site scores as linear combinations of the environmental variables
+# Triplots of the rda results (lc site scores)
+# Site scores as linear combinations of the environmental variables
 par(mfrow=c(1,3))
 plot(spe.rda, scaling = 1,   display = c("lc"), main = "RDA - sites")
 plot(spe.rda, scaling = 1,   display = c("sp"), main = "RDA - species")
@@ -232,6 +249,9 @@ spe.rda.all <- rda(spe.hel ~ ., data = env)
 step.forward <- ordistep(mod0, scope = formula(spe.rda.all), direction = "forward", permutations = how(nperm = 999))
 RsquareAdj(step.forward)
 
+
+#TRAITS
+#Compute RDA
 traits.pca <- rda(traits, scale = TRUE, row.wt = spe.ca$cw) #ADDED THE WEIGHT HERE
 traits.pca
 summary(traits.pca)
@@ -239,19 +259,13 @@ par(mfrow = c(1, 2))
 biplot(traits.pca, main = "PCA - scaling 2")
 biplot(traits.pca, scaling = 1, main = "PCA - scaling 1")
 arrows(0, 0,  traits.pca[, 1], traits.pca[, 2])
+text(traits.pca, disp = "species",scaling=1)
 
-
-#try nmds or to filter before cca
-spe.nmds <- metaMDS(spe, distance = "bray")
-spe.nmds$stress
-plot(spe.nmds, type = "t",main = paste("NMDS Bray Curtis; Stress =",round(spe.nmds$stress, 3)))
-
+#plot env and traits together
 par(mfrow = c(1, 2))
-stressplot(spe.nmds, main = "Shepard plot")
-gof <- goodness(spe.nmds)
-gof
-plot(spe.nmds, type = "t", main = "Goodness of fit")
-points(spe.nmds, display = "sites", cex = gof * 300) #to see the goodness of fit if the sites
+biplot(env.pca, scaling = 1, main = "PCA - scaling 1")
+biplot(traits.pca, scaling = 1, main = "PCA - scaling 1")
+text(traits.pca, disp = "species",scaling=1, col = "red")
 
 
 ##PAPER
@@ -277,3 +291,10 @@ four.comb.aravo <- fourthcorner(aravo$env, aravo$spe,
                                 aravo$traits, modeltype = 6, p.adjust.method.G = "none",
                                 p.adjust.method.D = "none", nrepet = nrepet)
 plot(four.comb.aravo)
+
+
+#LDA
+library(MASS)
+env.lda <- lda(Snow ~ ., as.data.frame(env))
+plot(env.lda, 
+     col=c("red","green","blue")[env$Snow])
