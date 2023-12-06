@@ -114,7 +114,7 @@ plot(spe.ch.ward,  main = "Chord - Ward")
 
 
 #k-means clustering, you can change the number 5 to change the number of groups for splitting
-spe.ch.k<-  kmeans(spe.ch, centers=8)
+spe.ch.k<-  kmeans(spe.ch, centers=5)
 spe.ch.k
 
 
@@ -147,16 +147,27 @@ Nb.UPGMA
 plot(3:30,Nb.UPGMA$All.index, xlab="Number of clusters", ylab="Calinski and Harabasz index")
 abline(v=5, col="red", lty=2)
 
+plot(spe.ch, spe.ch.ward.coph,
+     xlab = "Chord distance",
+     ylab = "Cophenetic distance",
+     asp = 1, xlim = c(0, sqrt(2)),
+     ylim = c(0, sqrt(2)),
+     main = c("Single linkage", paste("Cophenetic correlation =", round(cor(spe.ch, spe.ch.ward.coph), 3))))
+abline(0, 1) #addig line to the plot (incidence, slope)
+lines(lowess(spe.ch, spe.ch.ward.coph, f = 0.1), col = "red", lwd=3)
+
 
 #SUPERVISED CLASSIFICATION
-spe.cw.g <- cutree(spe.ch.ward, 5)
+spe.cw.g <- cutree(spe.ch.ward, 4)
 spe.cw.g
 
 D<-cbind(spe.cw.g,env,spe)
+
 class.groups=ctree(as.factor(spe.cw.g)~ PhysD+Slope+ZoogD+Aspect+Form+Snow, data = D)
 plot(class.groups)
+?ctree
 
-class.snow<-ctree(Snow~PhysD+Slope+ZoogD+Aspect+Form, data = D)
+class.snow<-ctree(ZoogD~PhysD+Slope+Snow+Aspect+Form, data = D)
 plot(class.snow)
 
 rf <- randomForest(as.factor(spe.cw.g)~., env, ntree=500, mtry=, importance=TRUE,
@@ -173,13 +184,8 @@ partialPlot(rf, env, ZoogD)
 partialPlot(rf, env, Snow)
 
 
-# classification of traits
-traits.norm <- decostand(traits, "normalize")
-traits.ch <- vegdist(traits.norm, "euc")
-tra.ch.ward <- hclust(traits.ch, method = "ward.D2")
-plot(tra.ch.ward,  main = "Chord - Ward")
-tra.cw.g <- cutree(tra.ch.ward, 4)
 
+### ORDINATION
 
 ##SPECIES
 #Compute CA
@@ -221,7 +227,12 @@ points(spe.nmds, display = "sites", cex = gof * 300) #to see the goodness of fit
 
 #ENV VARIABLES
 #Compute RDA
-env.pca <- rda(env, scale = TRUE, row.wt = spe.ca$lw) #ADDED THE WEIGHT HERE
+#to compute rda we need non numerical variable
+#this is to substitute the ZoogD variable with 3 variables, one for each value
+encoded_vars <- model.matrix(~ ZoogD - 1, data = D)
+env_vars_processed <- cbind(env[, -which(names(env) %in% "ZoogD")], encoded_vars)
+
+env.pca <- rda(env_vars_processed, scale = TRUE, row.wt = spe.ca$lw) #ADDED THE WEIGHT HERE
 env.pca
 summary(env.pca)
 par(mfrow = c(1, 2))
@@ -263,9 +274,16 @@ text(traits.pca, disp = "species",scaling=1)
 
 #plot env and traits together
 par(mfrow = c(1, 2))
-biplot(env.pca, scaling = 1, main = "PCA - scaling 1")
-biplot(traits.pca, scaling = 1, main = "PCA - scaling 1")
-text(traits.pca, disp = "species",scaling=1, col = "red")
+biplot(env.pca, scaling = 1, main = "PCA on Environmental variables")
+biplot(traits.pca, scaling = 1, main = "PCA on Traits")
+#custom_pink <- rgb(255, 170, 100, maxColorValue = 255)
+text(traits.pca, disp = "species",scaling=1, col = "pink")
+
+
+
+
+
+
 
 
 ##PAPER
